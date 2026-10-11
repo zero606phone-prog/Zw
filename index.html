@@ -1,0 +1,147 @@
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>نظام المبيعات</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#EDF1F5;--card:#fff;--ink:#16202B;--mut:#64748B;--pri:#0F766E;--onp:#fff;--acc:#D97706;--bd:#D8E0E8;--bad:#C2410C;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0E1620;--card:#17222F;--ink:#E6EDF3;--mut:#93A4B5;--pri:#2DD4BF;--onp:#06201D;--acc:#FBBF24;--bd:#2A3A4B;--bad:#FB923C}}
+:root[data-theme="dark"]{--bg:#0E1620;--card:#17222F;--ink:#E6EDF3;--mut:#93A4B5;--pri:#2DD4BF;--onp:#06201D;--acc:#FBBF24;--bd:#2A3A4B;--bad:#FB923C}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 'IBM Plex Sans Arabic',system-ui,sans-serif}
+header{padding:14px 16px 6px;font-size:20px;font-weight:700}
+main{padding:8px 12px 96px;max-width:720px;margin:auto}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
+nav button{flex:1;border:0;background:none;color:var(--mut);padding:8px 0;font:inherit;font-size:12px}
+nav button span{display:block;font-size:20px}
+nav button.on{color:var(--pri);font-weight:700}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin:8px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:8px 0}
+.pi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;text-align:right;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:2px}
+.pi:disabled{opacity:.45}.pi span{color:var(--pri);font-weight:700}.pi small{color:var(--mut)}
+input,select{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;margin:4px 0}
+label{font-size:13px;color:var(--mut)}
+.btn{border:1px solid var(--bd);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font:inherit;font-weight:600}
+.btn.p{background:var(--pri);color:var(--onp);border-color:var(--pri);width:100%;padding:12px;font-size:16px}
+.btn.s{padding:5px 10px;font-size:13px}.btn.d{color:var(--bad)}
+.r{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.r+.r{border-top:1px solid var(--bd);margin-top:8px;padding-top:8px}
+.mut{color:var(--mut);font-size:13px}.bad{color:var(--bad)}
+.tot{font-size:22px;font-weight:700;color:var(--acc)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:8px}.stat b{display:block;font-size:19px}
+.seg{display:flex;gap:6px}.seg .btn{flex:1}.seg .on{background:var(--pri);color:var(--onp);border-color:var(--pri)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:9}
+.sh{background:var(--card);width:100%;max-width:720px;max-height:88%;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+#t{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:20px;z-index:10;display:none}
+.q{display:flex;align-items:center;gap:6px}.q button{width:30px;height:30px;padding:0}
+</style></head><body>
+<header id="hd"></header><main id="main"></main><div id="t"></div>
+<nav id="nav"></nav>
+<script>
+let S={products:[],customers:[],invoices:[],seq:0,cfg:{name:'نظام المبيعات',cur:'ج.م'}};
+try{const r=localStorage.getItem('sales_v1');if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem('sales_v1',JSON.stringify(S))}catch(e){}};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const f=n=>(+n||0).toLocaleString('en-US',{maximumFractionDigits:2})+' '+esc(S.cfg.cur);
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+const prod=id=>S.products.find(p=>p.id===id),cu=id=>S.customers.find(c=>c.id===id);
+const dt=d=>new Date(d).toLocaleString('en-GB',{dateStyle:'short',timeStyle:'short'});
+let tab='pos',cart=[],disc=0,cust='',pay='cash',q='',cb=null;
+const TABS=[['pos','🛒','البيع'],['prod','📦','المنتجات'],['cust','👥','العملاء'],['inv','🧾','الفواتير'],['rep','📊','التقارير']];
+function toast(m){const t=$('#t');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200)}
+function modal(h){closeM();const d=document.createElement('div');d.className='ov';d.id='m';d.onclick=e=>{if(e.target===d)closeM()};d.innerHTML='<div class="sh">'+h+'</div>';document.body.appendChild(d)}
+function closeM(){const m=$('#m');if(m)m.remove()}
+function ask(msg,fn){cb=fn;modal(`<p>${msg}</p><div class="r"><button class="btn" onclick="closeM()">إلغاء</button><button class="btn p" style="width:auto" onclick="cb();closeM()">تأكيد</button></div>`)}
+function go(t){tab=t;render()}
+function render(){
+ $('#hd').textContent=S.cfg.name;
+ $('#nav').innerHTML=TABS.map(t=>`<button class="${t[0]===tab?'on':''}" onclick="go('${t[0]}')"><span>${t[1]}</span>${t[2]}</button>`).join('');
+ $('#main').innerHTML=V[tab]();
+ if(tab==='pos'){list();cartUI()}
+}
+/* ---------- POS ---------- */
+function list(){
+ const el=$('#pl');if(!el)return;
+ if(!S.products.length){el.outerHTML='<div class="card" id="pl">لا توجد منتجات بعد.<div class="r" style="margin-top:10px"><button class="btn" onclick="prodForm()">إضافة منتج</button><button class="btn" onclick="demo()">تحميل بيانات تجريبية</button></div></div>';return}
+ const r=S.products.filter(p=>p.name.toLowerCase().includes(q.toLowerCase()));
+ el.innerHTML=r.map(p=>`<button class="pi" onclick="add('${p.id}')" ${p.stock<=0?'disabled':''}><b>${esc(p.name)}</b><span>${f(p.price)}</span><small>${p.stock<=0?'نفد':'متاح '+p.stock}</small></button>`).join('')||'<div class="mut">لا نتائج</div>';
+}
+function add(id){const p=prod(id);let l=cart.find(x=>x.id===id);if(!l){l={id,q:0};cart.push(l)}
+ if(l.q+1>p.stock){toast('الكمية المتاحة '+p.stock+' فقط');return}l.q++;cartUI()}
+function chg(id,d){const l=cart.find(x=>x.id===id),p=prod(id);if(d>0&&l.q+1>p.stock){toast('الكمية المتاحة '+p.stock+' فقط');return}
+ l.q+=d;if(l.q<=0)cart=cart.filter(x=>x.id!==id);cartUI()}
+const sub=()=>cart.reduce((a,l)=>a+l.q*prod(l.id).price,0);
+function cartUI(){
+ const el=$('#cart');if(!el)return;
+ cart=cart.filter(l=>prod(l.id));
+ const s=sub(),d=Math.min(Math.max(+disc||0,0),s),t=s-d;
+ el.innerHTML=(cart.length?cart.map(l=>{const p=prod(l.id);return `<div class="r"><div><b>${esc(p.name)}</b><div class="mut">${f(p.price)}</div></div><div class="q"><button class="btn" onclick="chg('${l.id}',-1)">−</button><b>${l.q}</b><button class="btn" onclick="chg('${l.id}',1)">+</button></div></div>`}).join(''):'<div class="mut">السلة فارغة. اختر منتجات من القائمة.</div>')+
+ `<div class="r"><label>خصم</label><input type="number" inputmode="decimal" min="0" value="${disc||''}" style="width:110px" oninput="disc=this.value;tt()"></div>
+ <label>العميل</label><select onchange="cust=this.value"><option value="">عميل نقدي</option>${S.customers.map(c=>`<option value="${c.id}" ${c.id===cust?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+ <div class="seg" style="margin:8px 0"><button class="btn ${pay==='cash'?'on':''}" onclick="pay='cash';cartUI()">نقدي</button><button class="btn ${pay==='credit'?'on':''}" onclick="pay='credit';cartUI()">آجل</button></div>
+ <div class="r"><span>الإجمالي</span><span class="tot" id="tt">${f(t)}</span></div>
+ <button class="btn p" onclick="checkout()">إتمام البيع</button>`;
+}
+function tt(){const s=sub(),d=Math.min(Math.max(+disc||0,0),s);$('#tt').textContent=f(s-d)}
+function checkout(){
+ if(!cart.length){toast('السلة فارغة');return}
+ if(pay==='credit'&&!cust){toast('اختر عميلاً للبيع الآجل');return}
+ const s=sub(),d=Math.min(Math.max(+disc||0,0),s),t=s-d;
+ const items=cart.map(l=>{const p=prod(l.id);p.stock-=l.q;return {id:p.id,name:p.name,q:l.q,p:p.price,c:p.cost||0}});
+ const profit=items.reduce((a,i)=>a+i.q*(i.p-i.c),0)-d;
+ const inv={id:uid(),no:++S.seq,date:Date.now(),items,disc:d,total:t,cust,pay,profit};
+ S.invoices.push(inv);
+ if(pay==='credit'){cu(cust).bal=(cu(cust).bal||0)+t}
+ save();cart=[];disc=0;cust='';pay='cash';render();toast('تم البيع');viewInv(inv.id)
+}
+/* ---------- Products ---------- */
+function prodForm(id){const p=id?prod(id):{name:'',price:'',cost:'',stock:''};
+ modal(`<h3>${id?'تعديل منتج':'منتج جديد'}</h3><label>الاسم</label><input id="a" value="${esc(p.name)}"><label>سعر البيع</label><input id="b" type="number" inputmode="decimal" value="${p.price}"><label>سعر التكلفة</label><input id="c" type="number" inputmode="decimal" value="${p.cost}"><label>الكمية في المخزون</label><input id="d" type="number" inputmode="numeric" value="${p.stock}"><button class="btn p" onclick="saveProd('${id||''}')">حفظ</button>`)}
+function saveProd(id){const n=$('#a').value.trim();if(!n){toast('اكتب اسم المنتج');return}
+ const o={name:n,price:+$('#b').value||0,cost:+$('#c').value||0,stock:parseInt($('#d').value)||0};
+ if(id)Object.assign(prod(id),o);else S.products.push({id:uid(),...o});
+ save();closeM();render()}
+function delProd(id){ask('حذف هذا المنتج؟ الفواتير السابقة لن تتأثر.',()=>{S.products=S.products.filter(p=>p.id!==id);save();render()})}
+function demo(){[['قلم',5,3,100],['دفتر',25,15,50],['مياه معدنية',8,5,80],['عصير',15,10,40],['شاحن موبايل',120,80,15],['سماعة',200,130,10]].forEach(a=>S.products.push({id:uid(),name:a[0],price:a[1],cost:a[2],stock:a[3]}));save();render()}
+/* ---------- Customers ---------- */
+function custForm(id){const c=id?cu(id):{name:'',phone:''};
+ modal(`<h3>${id?'تعديل عميل':'عميل جديد'}</h3><label>الاسم</label><input id="a" value="${esc(c.name)}"><label>الهاتف</label><input id="b" type="tel" value="${esc(c.phone)}"><button class="btn p" onclick="saveCust('${id||''}')">حفظ</button>`)}
+function saveCust(id){const n=$('#a').value.trim();if(!n){toast('اكتب اسم العميل');return}
+ if(id){Object.assign(cu(id),{name:n,phone:$('#b').value})}else S.customers.push({id:uid(),name:n,phone:$('#b').value,bal:0});
+ save();closeM();render()}
+function payForm(id){const c=cu(id);modal(`<h3>تحصيل من ${esc(c.name)}</h3><div class="mut">المستحق: ${f(c.bal)}</div><label>المبلغ المحصّل</label><input id="a" type="number" inputmode="decimal" value="${c.bal}"><button class="btn p" onclick="doPay('${id}')">تأكيد التحصيل</button>`)}
+function doPay(id){const c=cu(id),a=Math.min(+$('#a').value||0,c.bal);if(a<=0){toast('اكتب مبلغاً صحيحاً');return}c.bal-=a;save();closeM();render();toast('تم التحصيل')}
+/* ---------- Invoices ---------- */
+function viewInv(id){const i=S.invoices.find(x=>x.id===id);if(!i)return;const c=i.cust&&cu(i.cust);
+ modal(`<h3>فاتورة #${i.no}</h3><div class="mut">${dt(i.date)} · ${i.pay==='credit'?'آجل':'نقدي'}${c?' · '+esc(c.name):''}</div>`+
+ i.items.map(x=>`<div class="r"><span>${esc(x.name)} × ${x.q}</span><b>${f(x.q*x.p)}</b></div>`).join('')+
+ (i.disc?`<div class="r"><span>خصم</span><b>− ${f(i.disc)}</b></div>`:'')+
+ `<div class="r"><span>الإجمالي</span><span class="tot">${f(i.total)}</span></div><div class="r"><button class="btn d" onclick="cancelInv('${i.id}')">إلغاء الفاتورة</button><button class="btn" onclick="copyInv('${i.id}')">نسخ النص</button></div>`)}
+function copyInv(id){const i=S.invoices.find(x=>x.id===id);
+ const t=`${S.cfg.name}\nفاتورة #${i.no} - ${dt(i.date)}\n`+i.items.map(x=>`${x.name} × ${x.q} = ${x.q*x.p}`).join('\n')+(i.disc?`\nخصم: ${i.disc}`:'')+`\nالإجمالي: ${i.total} ${S.cfg.cur}`;
+ try{navigator.clipboard.writeText(t).then(()=>toast('تم النسخ'),()=>toast('تعذّر النسخ'))}catch(e){toast('تعذّر النسخ')}}
+function cancelInv(id){closeM();ask('إلغاء الفاتورة سيعيد الكميات للمخزون. متابعة؟',()=>{
+ const i=S.invoices.find(x=>x.id===id);
+ i.items.forEach(x=>{const p=prod(x.id);if(p)p.stock+=x.q});
+ if(i.pay==='credit'&&cu(i.cust))cu(i.cust).bal-=i.total;
+ S.invoices=S.invoices.filter(x=>x.id!==id);save();render();toast('تم إلغاء الفاتورة')})}
+/* ---------- Views ---------- */
+const V={
+ pos:()=>`<input id="q" type="search" placeholder="ابحث عن منتج..." value="${esc(q)}" oninput="q=this.value;list()"><div class="grid" id="pl"></div><div class="card" id="cart"></div>`,
+ prod:()=>`<button class="btn p" onclick="prodForm()">+ منتج جديد</button>`+(S.products.length?`<div class="card">`+S.products.map(p=>`<div class="r"><div><b>${esc(p.name)}</b><div class="mut">بيع ${f(p.price)} · تكلفة ${f(p.cost)}</div><div class="${p.stock<=5?'bad':'mut'}">المخزون: ${p.stock}${p.stock<=5?' (منخفض)':''}</div></div><div><button class="btn s" onclick="prodForm('${p.id}')">تعديل</button> <button class="btn s d" onclick="delProd('${p.id}')">حذف</button></div></div>`).join('')+`</div>`:`<div class="card">أضف أول منتج لتبدأ البيع.</div>`),
+ cust:()=>`<button class="btn p" onclick="custForm()">+ عميل جديد</button>`+(S.customers.length?`<div class="card">`+S.customers.map(c=>`<div class="r"><div><b>${esc(c.name)}</b><div class="mut">${esc(c.phone)||'بدون هاتف'}</div><div class="${c.bal>0?'bad':'mut'}">المستحق: ${f(c.bal)}</div></div><div>${c.bal>0?`<button class="btn s" onclick="payForm('${c.id}')">تحصيل</button> `:''}<button class="btn s" onclick="custForm('${c.id}')">تعديل</button></div></div>`).join('')+`</div>`:`<div class="card">لا يوجد عملاء. أضف عميلاً لتسجيل المبيعات الآجلة.</div>`),
+ inv:()=>S.invoices.length?`<div class="card">`+S.invoices.slice().reverse().map(i=>`<div class="r" onclick="viewInv('${i.id}')"><div><b>#${i.no}</b> <span class="mut">${dt(i.date)}</span><div class="mut">${i.pay==='credit'?'آجل':'نقدي'}</div></div><b>${f(i.total)}</b></div>`).join('')+`</div>`:`<div class="card">لا توجد فواتير بعد.</div>`,
+ rep:()=>{
+  const td=new Date().toDateString(),today=S.invoices.filter(i=>new Date(i.date).toDateString()===td);
+  const sum=(a,k)=>a.reduce((x,i)=>x+i[k],0);
+  const debt=S.customers.reduce((a,c)=>a+(c.bal||0),0),stockVal=S.products.reduce((a,p)=>a+p.stock*(p.cost||0),0);
+  const m={};S.invoices.forEach(i=>i.items.forEach(x=>m[x.name]=(m[x.name]||0)+x.q));
+  const top=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,5),low=S.products.filter(p=>p.stock<=5);
+  return `<div class="stat"><div class="card"><span class="mut">مبيعات اليوم</span><b>${f(sum(today,'total'))}</b></div><div class="card"><span class="mut">أرباح اليوم</span><b>${f(sum(today,'profit'))}</b></div><div class="card"><span class="mut">إجمالي المبيعات</span><b>${f(sum(S.invoices,'total'))}</b></div><div class="card"><span class="mut">إجمالي الأرباح</span><b>${f(sum(S.invoices,'profit'))}</b></div><div class="card"><span class="mut">ديون العملاء</span><b>${f(debt)}</b></div><div class="card"><span class="mut">قيمة المخزون</span><b>${f(stockVal)}</b></div></div>
+  <div class="card"><b>الأكثر مبيعاً</b>${top.map(t=>`<div class="r"><span>${esc(t[0])}</span><b>${t[1]}</b></div>`).join('')||'<div class="mut">لا بيانات بعد</div>'}</div>
+  <div class="card"><b>مخزون منخفض</b>${low.map(p=>`<div class="r"><span>${esc(p.name)}</span><b class="bad">${p.stock}</b></div>`).join('')||'<div class="mut">كل المنتجات متوفرة</div>'}</div>
+  <div class="card"><b>الإعدادات</b><label>اسم المتجر</label><input value="${esc(S.cfg.name)}" onchange="S.cfg.name=this.value||'نظام المبيعات';save();render()"><label>العملة</label><input value="${esc(S.cfg.cur)}" onchange="S.cfg.cur=this.value;save();render()"><div class="mut">البيانات محفوظة داخل متصفح هذا الجهاز فقط.</div></div>`}
+};
+render();
+</script></body></html>
